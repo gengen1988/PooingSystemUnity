@@ -3,9 +3,9 @@ using UnityEngine;
 
 public class PoolingSystem2 : MonoBehaviour, IPoolingSystem
 {
-    private readonly Dictionary<int, ObjectPoolForPoolingSystem2> _poolByPrefab = new();
+    private readonly Dictionary<int, ObjectPoolSystem2> _poolByPrefab = new();
 
-    public PooledObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
+    public GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
     {
         // retrieve pool
         var pool = GetOrAddPool(prefab);
@@ -24,83 +24,39 @@ public class PoolingSystem2 : MonoBehaviour, IPoolingSystem
             Debug.LogWarning("spawn a non-active object. force activate it", poolingData);
         }
 
+        // notify gameplay (such as Explode)
+        poolingData.OnSpawn();
+
         return poolingData.CurrentHandle;
     }
 
-    public PooledObjectHandle GetPoolingHandleInParent(GameObject from)
+    public void RegisterSceneObject(IPoolingData dataComponent)
     {
-        var found = from.GetComponentInParent<PoolingSystem2DataComponent>();
-        if (found)
+        if (dataComponent is PoolingDataSystem2 poolingSystem2Data)
         {
-            return found.CurrentHandle;
+            Debug.Log($"register {poolingSystem2Data} as SceneObjectHandle", poolingSystem2Data);
+            var handle = new SceneGameObjectHandle(poolingSystem2Data.gameObject);
+            poolingSystem2Data.CurrentHandle = handle;
+            poolingSystem2Data.OnSpawn();
         }
         else
         {
-            return null;
+            Debug.LogWarning("invalid data component type");
         }
     }
 
-    /// for despawning subject found by physics query
-    public PooledObjectHandle GetPoolingHandle(GameObject from)
-    {
-        var found = from.GetComponent<PoolingSystem2DataComponent>();
-        if (found)
-        {
-            return found.CurrentHandle;
-        }
-        else
-        {
-            return null;
-        }
-    }
-
-    private ObjectPoolForPoolingSystem2 GetOrAddPool(GameObject prefab)
+    private ObjectPoolSystem2 GetOrAddPool(GameObject prefab)
     {
         var poolID = prefab.GetInstanceID();
         var pool = _poolByPrefab.GetValueOrDefault(poolID);
         if (!pool)
         {
             var poolObject = new GameObject($"Pool ({prefab.name})");
-            pool = poolObject.AddComponent<ObjectPoolForPoolingSystem2>();
+            pool = poolObject.AddComponent<ObjectPoolSystem2>();
             pool.Init(prefab);
             _poolByPrefab.Add(poolID, pool);
         }
 
         return pool;
     }
-
-    // public GameObject Spawn(Transform parent)
-    // {
-    //     var entry = _pool.Get();
-    //     var prefabTrans = prefab.transform;
-    //     var entryTrans = entry.transform;
-    //     // reset position and rotation to prefab's default
-    //     entryTrans.position = prefabTrans.position;
-    //     entryTrans.rotation = prefabTrans.rotation;
-    //     entryTrans.SetParent(parent);
-    //
-    //     if (!entry.activeSelf)
-    //     {
-    //         Debug.LogWarning("spawn a non-active object", entry);
-    //     }
-    //
-    //     return entry;
-    // }
-    //
-    // public GameObject Spawn(Vector3 position, Quaternion rotation)
-    // {
-    //     var entry = _pool.Get();
-    //     var trans = entry.transform;
-    //     trans.position = position;
-    //     trans.rotation = rotation;
-    //     trans.SetParent(null);
-    //
-    //     if (!entry.activeSelf)
-    //     {
-    //         Debug.LogWarning("spawn a non-active object", entry);
-    //     }
-    //
-    //     return entry;
-    // }
 }
-

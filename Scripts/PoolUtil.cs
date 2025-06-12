@@ -2,7 +2,7 @@
 
 public static class PoolUtil
 {
-    public static PooledObjectHandle Spawn(GameObject prefab, Transform parent = null)
+    public static GameObjectHandle Spawn(GameObject prefab, Transform parent = null)
     {
         if (!prefab)
         {
@@ -13,7 +13,7 @@ public static class PoolUtil
         return PoolManager.Instance.Spawn(prefab.gameObject, prefabTrans.localPosition, prefabTrans.localRotation, parent);
     }
 
-    public static PooledObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent = null)
+    public static GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent = null)
     {
         if (!prefab)
         {
@@ -23,54 +23,30 @@ public static class PoolUtil
         return PoolManager.Instance.Spawn(prefab.gameObject, localPosition, localRotation, parent);
     }
 
-    public static void Despawn(PooledObjectHandle handle)
+    public static void Despawn(GameObjectHandle handle)
     {
         PoolManager.Instance.DespawnAtLateUpdate(handle);
     }
 
-    public static void Despawn(GameObject instance, bool findInParent = false)
+    public static GameObjectHandle GetHandle(this GameObject gameObject, bool findInParent = false)
     {
-        PooledObjectHandle handle;
-        if (findInParent)
-        {
-            handle = PoolManager.Instance.GetPoolingHandleInParent(instance);
-        }
-        else
-        {
-            handle = PoolManager.Instance.GetPoolingHandle(instance);
-        }
-
-        if (!handle)
-        {
-            Debug.LogWarning($"not found pooling handle in {instance} (parent:{findInParent})", instance);
-        }
-
-        PoolManager.Instance.DespawnAtLateUpdate(handle);
+        var dataComponent = findInParent ? gameObject.GetComponentInParent<IPoolingData>() : gameObject.GetComponent<IPoolingData>();
+        return dataComponent?.CurrentHandle;
+    }
+    
+    public static RefHandle<T> CreateRef<T>(this GameObjectHandle baseHandle, T toBeRef) where T : class
+    {
+        return new RefHandle<T>(toBeRef, baseHandle);
     }
 
-    public static PooledRef<T> CreateHandle<T>(this T component, bool baseInParent = false) where T : Component
-    {
-        PooledObjectHandle baseHandle;
-        if (baseInParent)
-        {
-            baseHandle = PoolManager.Instance.GetPoolingHandleInParent(component.gameObject);
-        }
-        else
-        {
-            baseHandle = PoolManager.Instance.GetPoolingHandle(component.gameObject);
-        }
-
-        return new PooledRef<T>(component, baseHandle);
-    }
-
-    public static T Get<T>(this PooledObjectHandle handle) where T : Component
+    public static T Get<T>(this GameObjectHandle handle) where T : class
     {
         if (!handle)
         {
             return null;
         }
 
-        if (!handle.GameObject.TryGetComponent(out T component))
+        if (!handle.Value.TryGetComponent(out T component))
         {
             return null;
         }

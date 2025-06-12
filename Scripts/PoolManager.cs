@@ -3,24 +3,24 @@ using UnityEngine;
 
 public class PoolManager : MonoBehaviour
 {
-    // Singleton implementation
     private static PoolManager _instance;
     public static PoolManager Instance => _instance;
 
+    [SerializeField] private bool registerSceneObjects = true;
+
     private IPoolingSystem _poolingSystem;
-    private readonly List<PooledObjectHandle> _pendingDespawn = new();
+    private readonly List<GameObjectHandle> _pendingDespawn = new();
 
     protected virtual void Awake()
     {
-        if (_instance)
+        TryGetComponent(out _poolingSystem);
+        if (registerSceneObjects)
         {
-            Debug.LogAssertion($"{typeof(PoolManager)} has more than one instances", this);
+            RegisterSceneObjects();
         }
 
         _instance = this;
         Debug.Log($"[{typeof(PoolManager)}] registered as Singleton.", this);
-
-        TryGetComponent(out _poolingSystem);
     }
 
     private void LateUpdate()
@@ -40,7 +40,7 @@ public class PoolManager : MonoBehaviour
         }
     }
 
-    public PooledObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
+    public GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
     {
         if (!prefab)
         {
@@ -57,39 +57,7 @@ public class PoolManager : MonoBehaviour
         return _poolingSystem.Spawn(prefab, localPosition, localRotation, parent);
     }
 
-    public PooledObjectHandle GetPoolingHandle(GameObject instance)
-    {
-        if (!instance)
-        {
-            return null;
-        }
-
-        if (_poolingSystem == null)
-        {
-            Debug.LogError("PoolManager: Pooling system is not initialized.");
-            return null;
-        }
-
-        return _poolingSystem.GetPoolingHandle(instance);
-    }
-
-    public PooledObjectHandle GetPoolingHandleInParent(GameObject instance)
-    {
-        if (!instance)
-        {
-            return null;
-        }
-
-        if (_poolingSystem == null)
-        {
-            Debug.LogError("PoolManager: Pooling system is not initialized.");
-            return null;
-        }
-
-        return _poolingSystem.GetPoolingHandleInParent(instance);
-    }
-
-    public void DespawnAtLateUpdate(PooledObjectHandle handle)
+    public void DespawnAtLateUpdate(GameObjectHandle handle)
     {
         if (!handle)
         {
@@ -98,11 +66,38 @@ public class PoolManager : MonoBehaviour
 
         _pendingDespawn.Add(handle);
     }
+
+    private void RegisterSceneObjects()
+    {
+        foreach (var found in FindComponentsWithInterface<IPoolingData>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            _poolingSystem.RegisterSceneObject(found);
+        }
+    }
+
+    private static IEnumerable<T> FindComponentsWithInterface<T>(FindObjectsInactive findObjectsInactive, FindObjectsSortMode sortMode)
+        where T : class
+    {
+        var interfaceType = typeof(T);
+        var components = FindObjectsByType<MonoBehaviour>(findObjectsInactive, sortMode);
+        foreach (var component in components)
+        {
+            var componentType = component.GetType();
+            if (interfaceType.IsAssignableFrom(componentType))
+            {
+                yield return component as T;
+            }
+        }
+    }
 }
 
 public interface IPoolingSystem
 {
-    public PooledObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent);
-    public PooledObjectHandle GetPoolingHandle(GameObject from);
-    public PooledObjectHandle GetPoolingHandleInParent(GameObject from);
+    public GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent);
+    public void RegisterSceneObject(IPoolingData dataComponent);
+}
+
+public interface IPoolingData
+{
+    public GameObjectHandle CurrentHandle { get; }
 }
