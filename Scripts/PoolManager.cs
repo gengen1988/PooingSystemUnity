@@ -3,17 +3,18 @@ using UnityEngine;
 
 public class PoolManager : MonoBehaviour
 {
+    private static long _nextStamp;
     private static PoolManager _instance;
     public static PoolManager Instance => _instance;
 
+
     [SerializeField] private bool registerSceneObjects = true;
 
-    private IPoolingSystem _poolingSystem;
-    private readonly List<GameObjectHandle> _pendingDespawn = new();
+    private readonly List<PoolHandle> _pendingDespawn = new();
+    private readonly Dictionary<int, ObjectPool3> _poolByPrefab = new();
 
     protected virtual void Awake()
     {
-        TryGetComponent(out _poolingSystem);
         if (registerSceneObjects)
         {
             RegisterSceneObjects();
@@ -40,24 +41,7 @@ public class PoolManager : MonoBehaviour
         }
     }
 
-    public GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
-    {
-        if (!prefab)
-        {
-            Debug.LogWarning("PoolManager: Attempting to spawn a null prefab.");
-            return null;
-        }
-
-        if (_poolingSystem == null)
-        {
-            Debug.LogError("PoolManager: Pooling system is not initialized.");
-            return null;
-        }
-
-        return _poolingSystem.Spawn(prefab, localPosition, localRotation, parent);
-    }
-
-    public void DespawnAtLateUpdate(GameObjectHandle handle)
+    public void DespawnAtLateUpdate(PoolHandle handle)
     {
         if (!handle)
         {
@@ -67,37 +51,53 @@ public class PoolManager : MonoBehaviour
         _pendingDespawn.Add(handle);
     }
 
+    public PoolHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent)
+    {
+        // retrieve pool
+        var pool = GetOrAddPool(prefab);
+
+        // acquire entry and put it in right place
+        var poolingData = pool.Get();
+        poolingData.CurrentStamp = ++_nextStamp;
+        var trans = poolingData.transform;
+        trans.localPosition = localPosition;
+        trans.localRotation = localRotation;
+
+        // set active
+        trans.SetParent(parent, false);
+        if (!poolingData.gameObject.activeSelf)
+        {
+            poolingData.gameObject.SetActive(true);
+            Debug.LogWarning("spawn a non-active object. force activate it", poolingData);
+        }
+
+        // notify gameplay (such as Explode)
+        poolingData.OnSpawn();
+
+        return poolingData.CurrentHandle;
+    }
+
     private void RegisterSceneObjects()
     {
-        foreach (var found in FindComponentsWithInterface<IPoolingData>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        foreach (var found in FindObjectsByType<PoolingData3>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
         {
-            _poolingSystem.RegisterSceneObject(found);
+            found.CurrentStamp = ++_nextStamp;
+            found.OnSpawn();
         }
     }
 
-    private static IEnumerable<T> FindComponentsWithInterface<T>(FindObjectsInactive findObjectsInactive, FindObjectsSortMode sortMode)
-        where T : class
+    private ObjectPool3 GetOrAddPool(GameObject prefab)
     {
-        var interfaceType = typeof(T);
-        var components = FindObjectsByType<MonoBehaviour>(findObjectsInactive, sortMode);
-        foreach (var component in components)
+        var poolID = prefab.GetInstanceID();
+        var pool = _poolByPrefab.GetValueOrDefault(poolID);
+        if (!pool)
         {
-            var componentType = component.GetType();
-            if (interfaceType.IsAssignableFrom(componentType))
-            {
-                yield return component as T;
-            }
+            var poolObject = new GameObject($"Pool ({prefab.name})");
+            pool = poolObject.AddComponent<ObjectPool3>();
+            pool.Init(prefab);
+            _poolByPrefab.Add(poolID, pool);
         }
+
+        return pool;
     }
-}
-
-public interface IPoolingSystem
-{
-    public GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent);
-    public void RegisterSceneObject(IPoolingData dataComponent);
-}
-
-public interface IPoolingData
-{
-    public GameObjectHandle CurrentHandle { get; }
 }

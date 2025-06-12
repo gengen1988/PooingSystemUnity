@@ -2,44 +2,49 @@
 
 public static class PoolUtil
 {
-    public static GameObjectHandle Spawn(GameObject prefab, Transform parent = null)
+    public static PoolHandle Spawn(GameObject prefab, Transform parent = null)
     {
         if (!prefab)
         {
-            return null;
+            return default;
         }
 
         var prefabTrans = prefab.transform;
         return PoolManager.Instance.Spawn(prefab.gameObject, prefabTrans.localPosition, prefabTrans.localRotation, parent);
     }
 
-    public static GameObjectHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent = null)
+    public static PoolHandle Spawn(GameObject prefab, Vector3 localPosition, Quaternion localRotation, Transform parent = null)
     {
         if (!prefab)
         {
-            return null;
+            return default;
         }
 
         return PoolManager.Instance.Spawn(prefab.gameObject, localPosition, localRotation, parent);
     }
 
-    public static void Despawn(GameObjectHandle handle)
+    public static void Despawn(PoolHandle handle)
     {
         PoolManager.Instance.DespawnAtLateUpdate(handle);
     }
 
-    public static GameObjectHandle GetHandle(this GameObject gameObject, bool findInParent = false)
+    public static PoolHandle GetHandle(this GameObject gameObject, bool findInParent = false)
     {
-        var dataComponent = findInParent ? gameObject.GetComponentInParent<IPoolingData>() : gameObject.GetComponent<IPoolingData>();
-        return dataComponent?.CurrentHandle;
+        var dataComponent = findInParent ? gameObject.GetComponentInParent<PoolingData3>() : gameObject.GetComponent<PoolingData3>();
+        if (!dataComponent)
+        {
+            return default;
+        }
+
+        return dataComponent.CurrentHandle;
     }
-    
-    public static RefHandle<T> CreateRef<T>(this GameObjectHandle baseHandle, T toBeRef) where T : class
+
+    public static RefHandle<T> CreateRef<T>(this PoolHandle baseHandle, T toBeRef) where T : class
     {
         return new RefHandle<T>(toBeRef, baseHandle);
     }
 
-    public static T Get<T>(this GameObjectHandle handle) where T : class
+    public static T Get<T>(this PoolHandle handle) where T : class
     {
         if (!handle)
         {

@@ -1,8 +1,7 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Pool;
 
-/// this is a pool that use inactive parent to recycle
-public class ObjectPoolSystem2 : MonoBehaviour
+public class ObjectPool3 : MonoBehaviour
 {
     private enum PoolType
     {
@@ -16,35 +15,33 @@ public class ObjectPoolSystem2 : MonoBehaviour
     [SerializeField] private int defaultCapacity = 10; // only for stack pool
     [SerializeField] private int maxSize = 10000;
 
-    private IObjectPool<PoolingDataSystem2> _pool; // or LinkedPool for other behavior
+    private IObjectPool<PoolingData3> _pool; // or LinkedPool for other behavior
     private Transform _stagingTrans;
 
-    private PoolingDataSystem2 OnCreateEntry()
+    private PoolingData3 OnCreateEntry()
     {
         var go = Instantiate(prefab, _stagingTrans);
-        if (!go.TryGetComponent(out PoolingDataSystem2 poolingData))
+        if (!go.TryGetComponent(out PoolingData3 poolingData))
         {
-            poolingData = go.AddComponent<PoolingDataSystem2>();
+            poolingData = go.AddComponent<PoolingData3>();
+            poolingData.SourcePool = this;
             poolingData.hideFlags = HideFlags.HideAndDontSave;
         }
 
         return poolingData;
     }
 
-    private void OnGetEntry(PoolingDataSystem2 entry)
+    private void OnGetEntry(PoolingData3 entry)
     {
-        var handle = new PooledGameObjectHandleSystem2(entry, this);
-        entry.CurrentHandle = handle;
-        // entry.PoolingReset();
+        // do nothing
     }
 
-    private void OnReleaseEntry(PoolingDataSystem2 entry)
+    private void OnReleaseEntry(PoolingData3 entry)
     {
         entry.transform.SetParent(_stagingTrans, false); // do not calc transform changes
-        entry.CurrentHandle = null;
     }
 
-    private void OnDestroyEntry(PoolingDataSystem2 entry)
+    private void OnDestroyEntry(PoolingData3 entry)
     {
         if (!entry)
         {
@@ -72,7 +69,7 @@ public class ObjectPoolSystem2 : MonoBehaviour
         switch (poolType)
         {
             case PoolType.Stack:
-                _pool = new ObjectPool<PoolingDataSystem2>(
+                _pool = new ObjectPool<PoolingData3>(
                     OnCreateEntry,
                     OnGetEntry,
                     OnReleaseEntry,
@@ -82,8 +79,9 @@ public class ObjectPoolSystem2 : MonoBehaviour
                     maxSize
                 );
                 break;
+
             case PoolType.LinkedList:
-                _pool = new LinkedPool<PoolingDataSystem2>(
+                _pool = new LinkedPool<PoolingData3>(
                     OnCreateEntry,
                     OnGetEntry,
                     OnReleaseEntry,
@@ -96,12 +94,12 @@ public class ObjectPoolSystem2 : MonoBehaviour
         }
     }
 
-    public PoolingDataSystem2 Get()
+    public PoolingData3 Get()
     {
         return _pool.Get();
     }
 
-    public void Release(PoolingDataSystem2 entry)
+    public void Release(PoolingData3 entry)
     {
         _pool.Release(entry);
     }

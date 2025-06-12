@@ -2,17 +2,16 @@
 using System.Collections.Generic;
 using Object = UnityEngine.Object;
 
-/// baseHandle 是 null 是正常的，即找到的对象不是从池中分配的
-/// 此时 InValid 变成了对 Unity 指针的检查，用于处理 interface 引用 Component 的情况
 public readonly struct RefHandle<T> : IEquatable<RefHandle<T>> where T : class
 {
     private readonly T _value;
-    private readonly GameObjectHandle _baseHandle;
+    private readonly PoolHandle _baseHandle;
 
     public T Value => IsValid() ? _value : null;
-    public GameObjectHandle BaseHandle => _baseHandle;
 
-    public RefHandle(T value, GameObjectHandle baseHandle)
+    public PoolHandle BaseHandle => _baseHandle;
+
+    public RefHandle(T value, PoolHandle baseHandle)
     {
         _value = value;
         _baseHandle = baseHandle;
@@ -20,36 +19,33 @@ public readonly struct RefHandle<T> : IEquatable<RefHandle<T>> where T : class
 
     private bool IsValid()
     {
-        if (_baseHandle is not null)
+        if (_baseHandle.IsUndefined())
         {
-            return _baseHandle && IsValueValid();
+            return IsValidValue();
         }
         else
         {
-            return IsValueValid();
+            return _baseHandle && IsValidValue();
         }
     }
 
-    private bool IsValueValid()
+    private bool IsValidValue()
     {
         if (_value is Object unityObject)
         {
-            return unityObject; // 悬垂指针检查，即测试指针指向的物体是否被外部 destroy
+            return unityObject;
         }
         else
         {
-            return _value is not null;
+            return _value != null;
         }
     }
 
-    public static implicit operator bool(RefHandle<T> exists)
-    {
-        return exists.IsValid();
-    }
+    public static implicit operator bool(RefHandle<T> exists) => exists.IsValid();
 
     public bool Equals(RefHandle<T> other)
     {
-        return EqualityComparer<T>.Default.Equals(_value, other._value) && Equals(_baseHandle, other._baseHandle);
+        return EqualityComparer<T>.Default.Equals(_value, other._value) && _baseHandle.Equals(other._baseHandle);
     }
 
     public override bool Equals(object obj)
