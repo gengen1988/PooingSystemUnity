@@ -25,11 +25,21 @@ public static class PoolUtil
 
     public static void Despawn(PoolHandle handle)
     {
+        if (!handle)
+        {
+            return;
+        }
+
         PoolManager.Instance.DespawnAtLateUpdate(handle);
     }
 
     public static PoolHandle GetHandle(this GameObject gameObject, bool findInParent = false)
     {
+        if (!gameObject)
+        {
+            return default;
+        }
+
         var dataComponent = findInParent ? gameObject.GetComponentInParent<PoolingData3>() : gameObject.GetComponent<PoolingData3>();
         if (!dataComponent)
         {
@@ -51,7 +61,7 @@ public static class PoolUtil
             return null;
         }
 
-        if (!handle.Value.TryGetComponent(out T component))
+        if (!handle.Root.TryGetComponent(out T component))
         {
             return null;
         }

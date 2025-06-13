@@ -6,12 +6,13 @@ public readonly struct PoolHandle : IEquatable<PoolHandle>
     private readonly long _stamp;
     private readonly PoolingData3 _poolingData;
 
-    public GameObject Value => IsValid() ? _poolingData.gameObject : null;
+    public bool IsUndefined() => _poolingData is null; // default PoolHandle
+    public GameObject Root => IsValid() ? _poolingData.gameObject : null;
 
-    public PoolHandle(PoolingData3 poolingData)
+    public PoolHandle(PoolingData3 poolingData, long stamp)
     {
-        _stamp = poolingData.CurrentStamp;
         _poolingData = poolingData;
+        _stamp = stamp;
     }
 
     public void DespawnImmediate()
@@ -33,8 +34,6 @@ public readonly struct PoolHandle : IEquatable<PoolHandle>
     }
 
     public static implicit operator bool(PoolHandle exists) => exists.IsValid();
-
-    public bool IsUndefined() => _poolingData is null;
 
     public bool Equals(PoolHandle other)
     {
