@@ -5,8 +5,9 @@ public readonly struct PoolHandle : IEquatable<PoolHandle>
 {
     private readonly long _stamp;
     private readonly PoolingData3 _poolingData;
+    public static PoolHandle Undefined = default;
 
-    public bool IsUndefined() => _poolingData is null; // default PoolHandle
+    public bool IsUndefined() => _poolingData is null;
     public GameObject Root => IsValid() ? _poolingData.gameObject : null;
 
     public PoolHandle(PoolingData3 poolingData, long stamp)
@@ -17,7 +18,10 @@ public readonly struct PoolHandle : IEquatable<PoolHandle>
 
     public void DespawnImmediate()
     {
-        _poolingData?.Despawn(_stamp);
+        if (IsValid())
+        {
+            _poolingData.Despawn();
+        }
     }
 
     public void RegisterOnDespawn(Action callback)

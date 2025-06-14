@@ -9,11 +9,12 @@ public class PoolingData3 : MonoBehaviour
 
     public event Action OnDespawn;
 
-    private ISpawnEffect[] _spawnEffects;
+    private long _currentStamp = INVALID_STAMP; // for inspector debug
     private bool _isQuitting;
+    private ISpawnEffect[] _spawnEffects;
 
-    public long CurrentStamp { get; private set; } = INVALID_STAMP; // default is invalid
-    public PoolHandle CurrentHandle => new(this, CurrentStamp);
+    public long CurrentStamp => _currentStamp;
+    public PoolHandle CurrentHandle => new(this, _currentStamp);
     public ObjectPool3 SourcePool { get; set; }
 
     private void OnApplicationQuit()
@@ -26,36 +27,36 @@ public class PoolingData3 : MonoBehaviour
         _spawnEffects = gameObject.GetComponents<ISpawnEffect>();
     }
 
-    // 当这个GameObject被Unity销毁时自动调用 (应对情况1)
+    private void OnEnable()
+    {
+        Spawn();
+    }
+
+    /// 当这个GameObject被Unity销毁时自动调用 (应对情况1)
     private void OnDestroy()
     {
-        if (CurrentStamp != INVALID_STAMP && !_isQuitting)
+        if (_currentStamp != INVALID_STAMP && !_isQuitting)
         {
-            Debug.LogWarning($"Pooled object '{name}' was destroyed while active (Stamp: {CurrentStamp}). " +
-                             "This will cause a pool leak. Was it parented to a non-pooled object that got destroyed?", this);
+            Debug.LogWarning($"Pooled object '{name}' was destroyed while active (Stamp: {_currentStamp}). " +
+                             $"This will cause a pool leak. Was it parented to a non-pooled object that got destroyed? {StackTraceUtility.ExtractStackTrace()}",
+                this);
         }
     }
 
-    public void Spawn()
+    private void Spawn()
     {
-        CurrentStamp = ++_nextStamp;
+        _currentStamp = ++_nextStamp;
         foreach (var effect in _spawnEffects)
         {
             effect.OnSpawn(CurrentHandle);
         }
     }
 
-    public void Despawn(long stamp)
+    public void Despawn()
     {
-        // guard invalid handle
-        if (stamp != CurrentStamp)
-        {
-            return;
-        }
-
         // 严格检查：如果 handle 本身就是无效的，说明它从未被 Spawn 过。
         // 在这种情况下，“Despawn”是一个没有意义的操作。
-        if (CurrentStamp == INVALID_STAMP)
+        if (_currentStamp == INVALID_STAMP)
         {
             // 这是一个逻辑错误。我们不应该“猜测”开发者的意图是销毁它。
             // 我们应该通知开发者，他们的代码正在尝试 Despawn 一个无效的对象。
@@ -66,19 +67,16 @@ public class PoolingData3 : MonoBehaviour
         }
 
         // invalidate stamp immediately
-        CurrentStamp = INVALID_STAMP;
+        _currentStamp = INVALID_STAMP;
 
         // for registered callback (such as IDisposable.AddTo)
         OnDespawn?.Invoke();
         OnDespawn = null;
 
         // despawn children cascade
-        foreach (Transform child in transform)
+        foreach (var found in FindTopChildren(transform))
         {
-            foreach (var found in FindTopComponents<PoolingData3>(child))
-            {
-                found.CurrentHandle.DespawnImmediate();
-            }
+            found.Despawn();
         }
 
         // actual despawn
@@ -93,9 +91,9 @@ public class PoolingData3 : MonoBehaviour
         }
     }
 
-    private static IEnumerable<T> FindTopComponents<T>(Transform root) where T : class
+    private IEnumerable<PoolingData3> FindTopChildren(Transform root)
     {
-        if (root.TryGetComponent(out T comp))
+        if (root != transform && root.TryGetComponent(out PoolingData3 comp))
         {
             yield return comp;
         }
@@ -103,7 +101,7 @@ public class PoolingData3 : MonoBehaviour
         {
             foreach (Transform child in root)
             {
-                foreach (var found in FindTopComponents<T>(child))
+                foreach (var found in FindTopChildren(child))
                 {
                     yield return found;
                 }

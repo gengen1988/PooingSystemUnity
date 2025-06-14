@@ -37,13 +37,13 @@ public static class PoolUtil
     {
         if (!gameObject)
         {
-            return default;
+            return PoolHandle.Undefined;
         }
 
         var dataComponent = findInParent ? gameObject.GetComponentInParent<PoolingData3>() : gameObject.GetComponent<PoolingData3>();
         if (!dataComponent)
         {
-            return default;
+            return PoolHandle.Undefined;
         }
 
         return dataComponent.CurrentHandle;

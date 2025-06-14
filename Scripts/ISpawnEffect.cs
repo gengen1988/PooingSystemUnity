@@ -1,4 +1,5 @@
 ﻿public interface ISpawnEffect
 {
-    void OnSpawn(PoolHandle currentHandle);
+    /// after OnEnable
+    void OnSpawn(PoolHandle self);
 }

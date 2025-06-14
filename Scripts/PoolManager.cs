@@ -6,18 +6,11 @@ public class PoolManager : MonoBehaviour
     private static PoolManager _instance;
     public static PoolManager Instance => _instance;
 
-    [SerializeField] private bool registerSceneObjects = true;
-
     private readonly List<PoolHandle> _pendingDespawn = new();
     private readonly Dictionary<int, ObjectPool3> _poolByPrefab = new();
 
     protected virtual void Awake()
     {
-        if (registerSceneObjects)
-        {
-            RegisterSceneObjects();
-        }
-
         _instance = this;
         Debug.Log($"[{typeof(PoolManager)}] registered as Singleton.", this);
     }
@@ -53,24 +46,14 @@ public class PoolManager : MonoBehaviour
         trans.localRotation = localRotation;
 
         // set active
-        trans.SetParent(parent, false);
+        trans.SetParent(parent, false); // OnSpawn is a side effect in this step
         if (!poolingData.gameObject.activeSelf)
         {
             poolingData.gameObject.SetActive(true);
             Debug.LogWarning("spawn a non-active object. force activate it", poolingData);
         }
 
-        // distribute new stamp and notify gameplay (such as Explode)
-        poolingData.Spawn();
         return poolingData.CurrentHandle;
-    }
-
-    private void RegisterSceneObjects()
-    {
-        foreach (var found in FindObjectsByType<PoolingData3>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
-        {
-            found.Spawn();
-        }
     }
 
     private ObjectPool3 GetOrAddPool(GameObject prefab)
